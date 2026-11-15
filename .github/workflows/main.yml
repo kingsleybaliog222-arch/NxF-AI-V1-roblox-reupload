@@ -1,0 +1,425 @@
+
+import 'package:flutter/material.dart';
+
+void main() {
+  runApp(const NxFApp());
+}
+
+const purple = Color(0xFFAA55FF);
+const background = Color(0xFF050810);
+const panel = Color(0xFF111A2B);
+
+class NxFApp extends StatelessWidget {
+  const NxFApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'NxF AI',
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: background,
+        colorScheme: const ColorScheme.dark(
+          primary: purple,
+          surface: panel,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: background,
+          foregroundColor: Colors.white,
+        ),
+      ),
+      home: const NxFHome(),
+    );
+  }
+}
+
+class NxFHome extends StatefulWidget {
+  const NxFHome({super.key});
+
+  @override
+  State<NxFHome> createState() => _NxFHomeState();
+}
+
+class _NxFHomeState extends State<NxFHome> {
+  int page = 0;
+  final editor = TextEditingController();
+  String result = 'No script scanned yet.';
+  String status = 'Waiting for script';
+  final List<String> history = [];
+
+  static const example = '''
+-- NxF Safe Speedometer
+-- Roblox Studio LocalScript
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "NxFSpeedometer"
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local label = Instance.new("TextLabel")
+label.Size = UDim2.fromOffset(200, 60)
+label.Position = UDim2.new(0.5, -100, 0.8, 0)
+label.BackgroundColor3 = Color3.fromRGB(12, 10, 25)
+label.TextColor3 = Color3.fromRGB(190, 130, 255)
+label.TextScaled = true
+label.Text = "0 km/h"
+label.Parent = gui
+
+RunService.RenderStepped:Connect(function()
+    local speed = humanoid.MoveDirection.Magnitude
+        * humanoid.WalkSpeed
+    label.Text = string.format("%.1f km/h", speed * 1.008)
+end)
+''';
+
+  void scanScript() {
+    final code = editor.text.toLowerCase();
+
+    if (code.trim().isEmpty) {
+      setState(() {
+        status = 'EMPTY';
+        result = 'Please enter a script first.';
+      });
+      return;
+    }
+
+    final warnings = <String>[];
+
+    final patterns = {
+      'Dynamic code loading': 'loadstring',
+      'External HTTP request': 'httpget',
+      'Executor environment access': 'getgenv',
+      'File system access': 'writefile',
+      'Clipboard access': 'setclipboard',
+      'Executor-specific request': 'syn.request',
+    };
+
+    for (final entry in patterns.entries) {
+      if (code.contains(entry.value)) {
+        warnings.add(entry.key);
+      }
+    }
+
+    final encodedCount = RegExp(r'\\x[0-9a-f]{2}|\\[0-9]{2,3}')
+        .allMatches(code).length;
+
+    if (encodedCount > 10) {
+      warnings.add('Possible obfuscated code');
+    }
+
+    setState(() {
+      if (warnings.isEmpty) {
+        status = 'PRELIMINARY REVIEW PASSED';
+        result =
+            'No listed warning patterns detected. '
+            'This does not prove the script is safe.';
+      } else {
+        status = 'BLOCKED / QUARANTINED';
+        result =
+            'Guardian found suspicious patterns:\n\n'
+            '${warnings.map((e) => '• $e').join('\n')}\n\n'
+            'The script has not been executed. '
+            'Further inspection is required.';
+      }
+
+      history.insert(0, '$status — ${DateTime.now()}');
+    });
+  }
+
+  void generateExample() {
+    setState(() {
+      editor.text = example;
+      page = 1;
+    });
+  }
+
+  @override
+  void dispose() {
+    editor.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = [
+      homePage(),
+      editorPage(),
+      guardianPage(),
+      historyPage(),
+    ];
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'N E X U S  X  F A N T R I C K',
+          style: TextStyle(
+            color: purple,
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+          ),
+        ),
+      ),
+      body: SafeArea(child: pages[page]),
+      bottomNavigationBar: NavigationBar(
+        backgroundColor: panel,
+        indicatorColor: purple.withValues(alpha: 0.2),
+        selectedIndex: page,
+        onDestinationSelected: (value) {
+          setState(() => page = value);
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.code),
+            label: 'Editor',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.shield_outlined),
+            label: 'Guardian',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.history),
+            label: 'History',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget homePage() {
+    return ListView(
+      padding: const EdgeInsets.all(18),
+      children: [
+        const SizedBox(height: 20),
+        const Center(
+          child: Text(
+            'NxF AI',
+            style: TextStyle(
+              fontSize: 42,
+              fontWeight: FontWeight.bold,
+              color: purple,
+            ),
+          ),
+        ),
+        const Center(
+          child: Text(
+            'YOUR SAFE SCRIPTING COMPANION',
+            style: TextStyle(
+              color: Colors.white54,
+              letterSpacing: 2,
+              fontSize: 10,
+            ),
+          ),
+        ),
+        const SizedBox(height: 30),
+        card(
+          'Script Editor',
+          'Write and edit Lua scripts.',
+          Icons.code,
+          () => setState(() => page = 1),
+        ),
+        card(
+          'Script AI',
+          'Generate and explain safe scripts.',
+          Icons.smart_toy,
+          generateExample,
+        ),
+        card(
+          'Guardian AI',
+          'Inspect scripts for suspicious behavior.',
+          Icons.security,
+          () => setState(() => page = 2),
+        ),
+        card(
+          'Script History',
+          'View previous scan results.',
+          Icons.history,
+          () => setState(() => page = 3),
+        ),
+        const SizedBox(height: 20),
+        const Center(
+          child: Text(
+            'API NOT CONNECTED',
+            style: TextStyle(color: Colors.orange),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget editorPage() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Text(
+          'LUA SCRIPT EDITOR',
+          style: TextStyle(
+            color: purple,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: editor,
+          maxLines: 18,
+          minLines: 12,
+          style: const TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 13,
+          ),
+          decoration: InputDecoration(
+            hintText: '-- Write your Lua script here...',
+            filled: true,
+            fillColor: panel,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        ElevatedButton.icon(
+          onPressed: generateExample,
+          icon: const Icon(Icons.auto_awesome),
+          label: const Text('Generate Example'),
+        ),
+        ElevatedButton.icon(
+          onPressed: scanScript,
+          icon: const Icon(Icons.shield),
+          label: const Text('Scan with Guardian'),
+        ),
+        OutlinedButton.icon(
+          onPressed: () {
+            setState(() => editor.clear());
+          },
+          icon: const Icon(Icons.delete_outline),
+          label: const Text('Clear Editor'),
+        ),
+      ],
+    );
+  }
+
+  Widget guardianPage() {
+    return ListView(
+      padding: const EdgeInsets.all(18),
+      children: [
+        const Icon(
+          Icons.shield,
+          color: purple,
+          size: 75,
+        ),
+        const Center(
+          child: Text(
+            'NxF GUARDIAN',
+            style: TextStyle(
+              fontSize: 24,
+              color: purple,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        card(
+          'Script inspection',
+          'Check scripts for known suspicious patterns.',
+          Icons.search,
+          () {
+            scanScript();
+          },
+        ),
+        const SizedBox(height: 15),
+        const Text(
+          'LATEST SCAN',
+          style: TextStyle(color: purple),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          status,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.orange,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: panel,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(result),
+        ),
+        const SizedBox(height: 15),
+        const Text(
+          'Guardian prototype: pattern matching only. '
+          'It is not a complete AI security scanner.',
+          style: TextStyle(color: Colors.white54),
+        ),
+      ],
+    );
+  }
+
+  Widget historyPage() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Text(
+          'SCAN HISTORY',
+          style: TextStyle(
+            color: purple,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 15),
+        if (history.isEmpty)
+          const Text('No scans yet.')
+        else
+          ...history.map(
+            (item) => Card(
+              color: panel,
+              child: ListTile(
+                leading: const Icon(
+                  Icons.shield,
+                  color: purple,
+                ),
+                title: Text(item),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget card(
+    String title,
+    String subtitle,
+    IconData icon,
+    VoidCallback action,
+  ) {
+    return Card(
+      color: panel,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Icon(icon, color: purple, size: 30),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 15),
+        onTap: action,
+      ),
+    );
+  }
+}
